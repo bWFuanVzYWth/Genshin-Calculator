@@ -3,12 +3,12 @@
 (*目标是几只角色*)goalC=7;
 (*目标是几把武器*)goalR=5;
 
-stateNumcutC=90;
-stateNumcutR=80;
+stateNumCutC=90;
+stateNumCutR=80;
 
 (*计算总状态数*)
-stateNumC=goalC*180-stateNumcutC;
-stateNumR=goalR*240-stateNumcutR;
+stateNumC=goalC*180-stateNumCutC;
+stateNumR=goalR*240-stateNumCutR;
 stateNum=stateNumC+stateNumR+1;
 
 (*生成转移概率矩阵*)

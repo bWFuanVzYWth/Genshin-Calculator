@@ -1,21 +1,41 @@
-
 (*输入参数*)
-(*目标是几只角色*)goalC=7;
-(*目标是几把武器*)goalR=5;
+(*目标是几只角色*)goalC=1;
+(*目标是几把武器*)goalR=0;
 
-stateNumCutC=90;
-stateNumCutR=80;
+stateNumCutC=70;
+stateNumCutR=60;
 
 (*计算总状态数*)
-stateNumC=goalC*180-stateNumCutC;
-stateNumR=goalR*240-stateNumCutR;
+stateNumC=Max[0,goalC*180-stateNumCutC];
+stateNumR=Max[0,goalR*240-stateNumCutR];
 stateNum=stateNumC+stateNumR+1;
 
 (*生成转移概率矩阵*)
-M=SparseArray[0,{stateNum,stateNum}];
+M=SparseArray[
+	{
+		(*小保底提前*)
+		{i_,i_+1}/;((Mod[i+stateNumCutC,90]<=73)&&(i<=stateNumC))->(994/1000),
+		{i_,90-stateNumCutC}/;((Mod[i+stateNumCutC,180]<=73)&&(i<=stateNumC))->(3/1000),
+		{i_,180-stateNumCutC}/;((Mod[i+stateNumCutC,180]<=73)&&(i<=stateNumC))->(3/1000),
+	
+		(*小保底*)
+		(*{i_,i_+1}/;((Mod[i+stateNumCutC,90]>=74)&&(Mod[i+stateNumCutC,90]<=89)&&(i<=stateNumC))->(994/1000)-((i+stateNumCutC)-73)*(6/100),
+		{i_,90-stateNumCutC}/;((Mod[i+stateNumCutC,180]>=73)&&(Mod[i+stateNumCutC,180]<=89)&&(i<=stateNumC))->(3/1000)+((i+stateNumCutC)-73)*(3/100),
+		{i_,180-stateNumCutC}/;((Mod[i+stateNumCutC,180]>=73)&&(Mod[i+stateNumCutC,180]<=89)&&(i<=stateNumC))->(3/1000)+((i+stateNumCutC)-73)*(3/100),*)
+	
+		(*小保底吃满90抽*)
+	
+		(*大保底提前*)
+	
+		(*大保底*)
+	
+		(*大保底吃满180抽*)
+	},
+	{stateNum,stateNum}
+];
 
 (*生成初始概率向量*)
-V=SparseArray[0,stateNum];
+V=SparseArray[1->1,stateNum];
 
 (*抽1次卡*)
 

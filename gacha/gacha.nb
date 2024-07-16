@@ -1,43 +1,65 @@
+useMachinePrecision=True;
 (*输入参数*)
-(*目标是几只角色*)goalC=1;
-(*目标是几把武器*)goalR=0;
+抽取序列={{7,"角色"},{5,"武器"}};
 
-stateNumCutC=70;
-stateNumCutR=60;
 
-(*计算总状态数*)
-stateNumC=Max[0,goalC*180-stateNumCutC];
-stateNumR=Max[0,goalR*240-stateNumCutR];
-stateNum=stateNumC+stateNumR+1;
 
-(*生成转移概率矩阵*)
-M=SparseArray[
-	{
-		(*小保底提前*)
-		{i_,i_+1}/;((Mod[i+stateNumCutC,90]<=73)&&(i<=stateNumC))->(994/1000),
-		{i_,90-stateNumCutC}/;((Mod[i+stateNumCutC,180]<=73)&&(i<=stateNumC))->(3/1000),
-		{i_,180-stateNumCutC}/;((Mod[i+stateNumCutC,180]<=73)&&(i<=stateNumC))->(3/1000),
-	
-		(*小保底*)
-		(*{i_,i_+1}/;((Mod[i+stateNumCutC,90]>=74)&&(Mod[i+stateNumCutC,90]<=89)&&(i<=stateNumC))->(994/1000)-((i+stateNumCutC)-73)*(6/100),
-		{i_,90-stateNumCutC}/;((Mod[i+stateNumCutC,180]>=73)&&(Mod[i+stateNumCutC,180]<=89)&&(i<=stateNumC))->(3/1000)+((i+stateNumCutC)-73)*(3/100),
-		{i_,180-stateNumCutC}/;((Mod[i+stateNumCutC,180]>=73)&&(Mod[i+stateNumCutC,180]<=89)&&(i<=stateNumC))->(3/1000)+((i+stateNumCutC)-73)*(3/100),*)
-	
-		(*小保底吃满90抽*)
-	
-		(*大保底提前*)
-	
-		(*大保底*)
-	
-		(*大保底吃满180抽*)
+(*https://www.bilibili.com/read/cv10468091*)
+(*计算角色池第x抽出金概率*)
+pC[x_]:=Piecewise[{
+	{6/1000,1<=x<=73}
+	,{(6/1000)+(x-73)*(6/100),74<=x<=89}
+	,{1,x==90}
+}];
+
+(*生成角色池转移概率右上子矩阵*)
+SCTPM[size_]:=Normal[SparseArray[{
+		{i_,j_}/;((j==i)&&(1<=Mod[i,90]<=89))->1-pC[1+Mod[i-1,90]]
+		,{i_,j_}/;((j==Ceiling[i,180])&&(91<=1+Mod[i-1,180]))->pC[1+Mod[i-1,90]]
+		,{i_,j_}/;((j==Ceiling[i,90]||j==90+Ceiling[i,90])&&(1+Mod[i-1,180]<=90))->pC[1+Mod[i-1,90]]/2
 	},
-	{stateNum,stateNum}
+	{size,size}
+]];
+
+(*计算武器池第x抽出金概率*)
+pR[x_]:=Piecewise[{
+	{7/1000,1<=x<=62}
+	,{(7/1000)+(x-62)*(7/100),63<=x<=76}
+	,{1,x==77}
+}];
+
+(*生成武器池转移概率右上子矩阵*)
+SRTPM[size_]:=Normal[SparseArray[{
+		{i_,j_}/;((j==i)&&(1<=Mod[i,77]<=76))->1-pR[1+Mod[i-1,77]]
+		,{i_,j_}/;((j==Ceiling[i,77])&&(155<=1+Mod[i-1,231]))->pR[1+Mod[i-1,77]]
+		,{i_,j_}/;((j==Ceiling[i,77]||j==77+Ceiling[i,77])&&(78<=1+Mod[i-1,180]<=154))->pR[1+Mod[i-1,77]]/2
+		,{i_,j_}/;((j==Ceiling[i,77]||j==77+Ceiling[i,77]||j==154+Ceiling[i,77])&&(1+Mod[i-1,180]<=77))->pR[1+Mod[i-1,77]]/3
+	},
+	{size,size}
+]];
+
+STPM[type_,size_]:=Which[
+	type=="角色",SCTPM[size]
+	,type=="武器",SRTPM[size]
 ];
 
-(*生成初始概率向量*)
-V=SparseArray[1->1,stateNum];
+STPMSize[type_,num_]:=Which[
+	type=="角色",180*num
+	,type=="武器",231*num
+];
 
-(*抽1次卡*)
+goal=Transpose[抽取序列];
+subMatrixSize=MapThread[STPMSize,{goal[[2]],goal[[1]]}];
+subMatrix=MapThread[STPM,{goal[[2]],subMatrixSize}];
 
+TPMSize=Total[subMatrixSize]+1;
+realTPM(*Transition Probability Matrix*)=SparseArray[{Band[{1,2}]->subMatrix,{TPMSize,TPMSize}->1},{TPMSize,TPMSize}];
+realResult=SparseArray[{{1,1}->1},{1,TPMSize}];
 
-(*抽N次卡*)
+TPM=If[useMachinePrecision,N[realTPM],realTPM];
+result=If[useMachinePrecision,N[realResult],realResult];
+
+Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];
+
+ListPlot[result[[All,TPMSize]],PlotTheme->"Scientific"]
+MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific"]

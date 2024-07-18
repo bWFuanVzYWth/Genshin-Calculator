@@ -59,7 +59,8 @@ realResult=SparseArray[{{1,1}->1},{1,TPMSize}];
 TPM=If[useMachinePrecision,N[realTPM],realTPM];
 result=If[useMachinePrecision,N[realResult],realResult];
 
-Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];
+Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];//Timing
 
-ListPlot[result[[All,TPMSize]],PlotTheme->"Scientific"]
-MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific"]
+ListPlot[result[[All,TPMSize]],PlotTheme->"Scientific",ImageSize->1080]
+MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->1080]
+MatrixPlot[TPM,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->1080]

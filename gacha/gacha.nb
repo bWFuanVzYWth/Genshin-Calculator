@@ -1,6 +1,10 @@
-useMachinePrecision=True;
+useMachinePrecision=False;
 (*输入参数*)
-抽取序列={{7,"角色"},{5,"武器"}};
+(*抽取序列={{1,"角色"},{1,"武器"}};*)
+抽取序列={{1,"角色"},{1,"武器"}};
+角色已垫=73;
+武器已垫=0;
+抽取次数=150;
 
 
 
@@ -38,29 +42,40 @@ SRTPM[size_]:=Normal[SparseArray[{
 	{size,size}
 ]];
 
-STPM[type_,size_]:=Which[
+STPM[size_,type_]:=Which[
 	type=="角色",SCTPM[size]
 	,type=="武器",SRTPM[size]
 ];
 
-STPMSize[type_,num_]:=Which[
+STPMSize[num_,type_]:=Which[
 	type=="角色",180*num
 	,type=="武器",231*num
 ];
 
+(*生成子矩阵列表*)
 goal=Transpose[抽取序列];
-subMatrixSize=MapThread[STPMSize,{goal[[2]],goal[[1]]}];
-subMatrix=MapThread[STPM,{goal[[2]],subMatrixSize}];
+subMatrixSizeNoCut=MapThread[STPMSize,{goal[[1]],goal[[2]]}];
+subMatrixNoCut=MapThread[STPM,{subMatrixSizeNoCut,goal[[2]]}];
 
-TPMSize=Total[subMatrixSize]+1;
+(*对垫卡池的情况进行处理*)
+CutC[mat_]:=Drop[mat,角色已垫,角色已垫];
+subMatrixCutC=If[MemberQ[goal[[2]],"角色"],MapAt[CutC,subMatrixNoCut,FirstPosition[goal[[2]],"角色"][[1]]],subMatrixNoCut];
+
+CutR[mat_]:=Drop[mat,武器已垫,武器已垫];
+subMatrixCutR=If[MemberQ[goal[[2]],"武器"],MapAt[CutR,subMatrixCutC,FirstPosition[goal[[2]],"武器"][[1]]],subMatrixCutC];
+subMatrix=subMatrixCutR;
+
+(*合并子矩阵生成完整矩阵*)
+TPMSize=Total[subMatrixSizeNoCut]+1-If[MemberQ[goal[[2]],"角色"],角色已垫,0]-If[MemberQ[goal[[2]],"武器"],武器已垫,0];
 realTPM(*Transition Probability Matrix*)=SparseArray[{Band[{1,2}]->subMatrix,{TPMSize,TPMSize}->1},{TPMSize,TPMSize}];
 realResult=SparseArray[{{1,1}->1},{1,TPMSize}];
 
 TPM=If[useMachinePrecision,N[realTPM],realTPM];
 result=If[useMachinePrecision,N[realResult],realResult];
 
-Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];//Timing
+Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];(*//Timing*)
 
-ListPlot[result[[All,TPMSize]],PlotTheme->"Scientific",ImageSize->1080]
-MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->1080]
-MatrixPlot[TPM,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->1080]
+Print["抽取成功率 = ",If[抽取次数>TPMSize,1,N[result[[抽取次数,TPMSize]],20]]]
+ListPlot[result[[All,TPMSize]],PlotTheme->"Scientific",ImageSize->Large]
+MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]
+MatrixPlot[TPM,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]

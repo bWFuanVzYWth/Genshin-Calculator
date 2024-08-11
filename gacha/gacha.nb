@@ -1,10 +1,9 @@
 useMachinePrecision=True;
 (*输入参数*)
-(*抽取序列={{2,"角色"},{1,"武器"},{5,"角色"},{4,"武器"}};*)
-抽取序列={{3,"角色"},{1,"武器"}};
-角色已垫=90*0+1;
-武器已垫=77*0+1;
-抽取次数=500;
+抽取序列={{2,"角色"},{1,"武器"},{5,"角色"},{4,"武器"}};
+角色已垫=90*0+0;
+武器已垫=77*0+0;
+抽取次数=1200;
 
 
 
@@ -61,11 +60,10 @@ result=If[useMachinePrecision,N[ResultAP,MachinePrecision],ResultAP];
 Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];
 (*MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]*)
 
-SuccessRate = result[[All,TPMSize]];
-Print["抽卡成功率 = ",If[抽取次数>TPMSize,1,N[result[[抽取次数,TPMSize]]]]]
-ListPlot[SuccessRate
+Print["抽卡成功率 = ",N[result[[Min[抽取次数+1,TPMSize],TPMSize]]]]
+ListPlot[Table[{i-1,result[[i,TPMSize]]},{i,TPMSize}]
 	,ColorFunction->Function[{x,y},Hue[If[x==0,0,2/Pi*ArcTan[y/x]]]]
-	,GridLines->{{Min[抽取次数,TPMSize]},{SuccessRate[[Min[抽取次数,TPMSize]]]}}
+	,GridLines->{{Min[抽取次数+1,TPMSize]-1},{result[[Min[抽取次数+1,TPMSize],TPMSize]]}}
 	,PlotRange->Full
 	,ImageSize->Large
 ]

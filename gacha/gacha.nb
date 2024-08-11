@@ -1,81 +1,71 @@
-useMachinePrecision=False;
+useMachinePrecision=True;
 (*输入参数*)
-(*抽取序列={{1,"角色"},{1,"武器"}};*)
-抽取序列={{1,"角色"},{1,"武器"}};
-角色已垫=73;
-武器已垫=0;
-抽取次数=150;
+(*抽取序列={{2,"角色"},{1,"武器"},{5,"角色"},{4,"武器"}};*)
+抽取序列={{3,"角色"},{1,"武器"}};
+角色已垫=90*0+1;
+武器已垫=77*0+1;
+抽取次数=500;
 
 
 
-(*https://www.bilibili.com/read/cv10468091*)
+(*出金概率数据来源 https://www.bilibili.com/read/cv10468091*)
+
 (*计算角色池第x抽出金概率*)
 pC[x_]:=Piecewise[{
 	{6/1000,1<=x<=73}
 	,{(6/1000)+(x-73)*(6/100),74<=x<=89}
 	,{1,x==90}
-}];
-
-(*生成角色池转移概率右上子矩阵*)
-SCTPM[size_]:=Normal[SparseArray[{
-		{i_,j_}/;((j==i)&&(1<=Mod[i,90]<=89))->1-pC[1+Mod[i-1,90]]
-		,{i_,j_}/;((j==Ceiling[i,180])&&(91<=1+Mod[i-1,180]))->pC[1+Mod[i-1,90]]
-		,{i_,j_}/;((j==Ceiling[i,90]||j==90+Ceiling[i,90])&&(1+Mod[i-1,180]<=90))->pC[1+Mod[i-1,90]]/2
-	},
-	{size,size}
-]];
+},0];
 
 (*计算武器池第x抽出金概率*)
 pR[x_]:=Piecewise[{
 	{7/1000,1<=x<=62}
 	,{(7/1000)+(x-62)*(7/100),63<=x<=76}
 	,{1,x==77}
-}];
+},0];
+
+(*生成角色池转移概率右上子矩阵*)
+STPMC=SparseArray[{
+		{i_,j_}/;((j==i)&&(1<=Mod[i,90]<=89))->1-pC[1+Mod[i-1,90]]
+		,{i_,j_}/;((j==Ceiling[i,180])&&(91<=1+Mod[i-1,180]))->pC[1+Mod[i-1,90]]
+		,{i_,j_}/;((j==Ceiling[i,90]||j==90+Ceiling[i,90])&&(1+Mod[i-1,180]<=90))->pC[1+Mod[i-1,90]]/2
+	},
+	{180,180}
+];
 
 (*生成武器池转移概率右上子矩阵*)
-SRTPM[size_]:=Normal[SparseArray[{
+STPMR=SparseArray[{
 		{i_,j_}/;((j==i)&&(1<=Mod[i,77]<=76))->1-pR[1+Mod[i-1,77]]
 		,{i_,j_}/;((j==Ceiling[i,77])&&(155<=1+Mod[i-1,231]))->pR[1+Mod[i-1,77]]
 		,{i_,j_}/;((j==Ceiling[i,77]||j==77+Ceiling[i,77])&&(78<=1+Mod[i-1,180]<=154))->pR[1+Mod[i-1,77]]/2
 		,{i_,j_}/;((j==Ceiling[i,77]||j==77+Ceiling[i,77]||j==154+Ceiling[i,77])&&(1+Mod[i-1,180]<=77))->pR[1+Mod[i-1,77]]/3
 	},
-	{size,size}
-]];
-
-STPM[size_,type_]:=Which[
-	type=="角色",SCTPM[size]
-	,type=="武器",SRTPM[size]
+	{231,231}
 ];
 
-STPMSize[num_,type_]:=Which[
-	type=="角色",180*num
-	,type=="武器",231*num
-];
+action=Transpose[抽取序列];
 
-(*生成子矩阵列表*)
-goal=Transpose[抽取序列];
-subMatrixSizeNoCut=MapThread[STPMSize,{goal[[1]],goal[[2]]}];
-subMatrixNoCut=MapThread[STPM,{subMatrixSizeNoCut,goal[[2]]}];
+STPMCut=Flatten[MapThread[Function[{num,str},Which[str=="角色",Table[STPMC,num],str=="武器",Table[STPMR,num]]],{action[[1]],action[[2]]}],1];
+STPMCutC=MapAt[Function[{mat},Drop[mat,角色已垫,角色已垫]],STPMCut,If[NumberQ[FirstPosition[STPMCut,STPMC][[1]]],FirstPosition[STPMCut,STPMC][[1]],{}]];
+STPMCutCR=MapAt[Function[{mat},Drop[mat,武器已垫,武器已垫]],STPMCutC,If[NumberQ[FirstPosition[STPMCut,STPMR][[1]]],FirstPosition[STPMCut,STPMR][[1]],{}]];
+STPM=STPMCutCR;
 
-(*对垫卡池的情况进行处理*)
-CutC[mat_]:=Drop[mat,角色已垫,角色已垫];
-subMatrixCutC=If[MemberQ[goal[[2]],"角色"],MapAt[CutC,subMatrixNoCut,FirstPosition[goal[[2]],"角色"][[1]]],subMatrixNoCut];
+TPMSize=Total[Map[Length,STPM]]+1;
+TPMAP=SparseArray[{Band[{1,2}]->Normal[STPM],{TPMSize,TPMSize}->1},{TPMSize,TPMSize}];
+ResultAP=Normal[SparseArray[{{1,1}->1},{1,TPMSize}]];
 
-CutR[mat_]:=Drop[mat,武器已垫,武器已垫];
-subMatrixCutR=If[MemberQ[goal[[2]],"武器"],MapAt[CutR,subMatrixCutC,FirstPosition[goal[[2]],"武器"][[1]]],subMatrixCutC];
-subMatrix=subMatrixCutR;
+TPM=If[useMachinePrecision,N[TPMAP,MachinePrecision],TPMAP];
+(*MatrixPlot[TPM,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]*)
 
-(*合并子矩阵生成完整矩阵*)
-TPMSize=Total[subMatrixSizeNoCut]+1-If[MemberQ[goal[[2]],"角色"],角色已垫,0]-If[MemberQ[goal[[2]],"武器"],武器已垫,0];
-realTPM(*Transition Probability Matrix*)=SparseArray[{Band[{1,2}]->subMatrix,{TPMSize,TPMSize}->1},{TPMSize,TPMSize}];
-realResult=SparseArray[{{1,1}->1},{1,TPMSize}];
+result=If[useMachinePrecision,N[ResultAP,MachinePrecision],ResultAP];
+Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];
+(*MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]*)
 
-TPM=If[useMachinePrecision,N[realTPM],realTPM];
-result=If[useMachinePrecision,N[realResult],realResult];
-
-Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];(*//Timing*)
-
-Print["抽取成功率 = ",If[抽取次数>TPMSize,1,N[result[[抽取次数,TPMSize]],20]]]
-ListPlot[result[[All,TPMSize]],PlotTheme->"Scientific",ImageSize->Large]
-MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]
-MatrixPlot[TPM,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]
+SuccessRate = result[[All,TPMSize]];
+Print["抽卡成功率 = ",If[抽取次数>TPMSize,1,N[result[[抽取次数,TPMSize]]]]]
+ListPlot[SuccessRate
+	,ColorFunction->Function[{x,y},Hue[If[x==0,0,2/Pi*ArcTan[y/x]]]]
+	,GridLines->{{Min[抽取次数,TPMSize]},{SuccessRate[[Min[抽取次数,TPMSize]]]}}
+	,PlotRange->Full
+	,ImageSize->Large
+]

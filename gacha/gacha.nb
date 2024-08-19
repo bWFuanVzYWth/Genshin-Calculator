@@ -1,9 +1,11 @@
 useMachinePrecision=True;
+显示精度=15;
+
 (*输入参数*)
-抽取序列={{2,"角色"},{1,"武器"},{5,"角色"},{4,"武器"}};
+抽取序列={{3,"角色"},{0,"武器"},{0,"角色"},{0,"武器"}};
 角色已垫=90*0+0;
 武器已垫=77*0+0;
-抽取次数=1200;
+抽取次数=320;
 
 
 
@@ -23,7 +25,8 @@ pR[x_]:=Piecewise[{
 	,{1,x==77}
 },0];
 
-(*生成角色池转移概率右上子矩阵*)
+(*以下为v2.0-v4.8*)
+(*(*生成角色池转移概率右上子矩阵*)
 STPMC=SparseArray[{
 		{i_,j_}/;((j==i)&&(1<=Mod[i,90]<=89))->1-pC[1+Mod[i-1,90]]
 		,{i_,j_}/;((j==Ceiling[i,180])&&(91<=1+Mod[i-1,180]))->pC[1+Mod[i-1,90]]
@@ -40,7 +43,27 @@ STPMR=SparseArray[{
 		,{i_,j_}/;((j==Ceiling[i,77]||j==77+Ceiling[i,77]||j==154+Ceiling[i,77])&&(1+Mod[i-1,180]<=77))->pR[1+Mod[i-1,77]]/3
 	},
 	{231,231}
+];*)
+
+(*以下为v5.0+*)
+STPMC=SparseArray[{
+		{i_,j_}/;((j==i)&&(1<=Mod[i,90]<=89))->1-pC[1+Mod[i-1,90]]
+		,{i_,j_}/;((j==Ceiling[i,180])&&(91<=1+Mod[i-1,180]))->pC[1+Mod[i-1,90]]
+		,{i_,j_}/;((j==Ceiling[i,90])&&(1+Mod[i-1,180]<=90))->pC[1+Mod[i-1,90]]*(45/100)
+		,{i_,j_}/;((j==90+Ceiling[i,90])&&(1+Mod[i-1,180]<=90))->pC[1+Mod[i-1,90]]*(55/100)
+	},
+	{180,180}
 ];
+(*STPMC//MatrixForm*)
+
+STPMR=SparseArray[{
+		{i_,j_}/;((j==i)&&(1<=Mod[i,77]<=76))->1-pR[1+Mod[i-1,77]]
+		,{i_,j_}/;((j==Ceiling[i,77]||j==77+Ceiling[i,77])&&(78<=1+Mod[i-1,180]<=154))->pR[1+Mod[i-1,77]]
+		,{i_,j_}/;((j==Ceiling[i,77]||j==77+Ceiling[i,77]||j==154+Ceiling[i,77])&&(1+Mod[i-1,180]<=77))->pR[1+Mod[i-1,77]]/2
+	},
+	{154,154}
+];
+(*STPMR//MatrixForm*)
 
 action=Transpose[抽取序列];
 
@@ -60,10 +83,19 @@ result=If[useMachinePrecision,N[ResultAP,MachinePrecision],ResultAP];
 Do[AppendTo[result,Dot[result[[i]],TPM]],{i,TPMSize-1}];
 (*MatrixPlot[result,MaxPlotPoints->Infinity,PlotTheme->"Scientific",ImageSize->Large]*)
 
-Print["抽卡成功率 = ",N[result[[Min[抽取次数+1,TPMSize],TPMSize]]]]
 ListPlot[Table[{i-1,result[[i,TPMSize]]},{i,TPMSize}]
 	,ColorFunction->Function[{x,y},Hue[If[x==0,0,2/Pi*ArcTan[y/x]]]]
 	,GridLines->{{Min[抽取次数+1,TPMSize]-1},{result[[Min[抽取次数+1,TPMSize],TPMSize]]}}
 	,PlotRange->Full
 	,ImageSize->Large
 ]
+
+Print["此策略平均抽数 = ",N[Total[Differences[result[[;;,TPMSize]]]*Table[i,{i,TPMSize-1}]]]]
+
+STPMSize=Table[Total[Map[Length,STPM][[1;;i]]],{i,Length[STPM]}];
+DistributionFrom=Join[{1},STPMSize[[;;-2]]-1];
+DistributionTo=STPMSize;
+Distribution=Join[Table[Total[result[[Min[抽取次数+1,TPMSize],DistributionFrom[[i]];;DistributionTo[[i]]]]],{i,Length[STPM]}],{result[[Min[抽取次数+1,TPMSize],TPMSize]]}];
+CountC=Table[Total[Join[{0},Map[Function[mat,If[mat==STPMC,1,0]],STPMCut]][[1;;i]]],{i,Length[Distribution]}];
+CountR=Table[Total[Join[{0},Map[Function[mat,If[mat==STPMR,1,0]],STPMCut]][[1;;i]]],{i,Length[Distribution]}];
+Do[Print["P(",CountC[[i]],"角色",CountR[[i]],"武器) = ",NumberForm[N[Distribution[[i]],显示精度],{显示精度,显示精度},ScientificNotationThreshold->{-Infinity,Infinity}]],{i,Length[Distribution]}]
